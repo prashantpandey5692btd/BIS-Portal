@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#071a36">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <title>{% block title %}BIS Portal{% endblock %} — Bureau of Indian Standards</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+<script>
+  (function(){
+    try {
+      if (localStorage.getItem('bis_theme') === 'light') {
+        document.body.className = 'theme-light';
+      }
+    } catch(e) {}
+  })();
+</script>
+
+  <header>
+    <a href="{{ url_for('index') }}" class="header-emblem" aria-label="BIS Home">BIS</a>
+
+    <div class="header-text">
+      <h1>Bureau of Indian Standards</h1>
+      <p>Standards · Testing · Certification · LIMS</p>
+    </div>
+
+    <nav aria-label="Main navigation">
+      <a href="{{ url_for('index') }}"
+         class="nav-link nav-link--home {% if active_page == 'home' %}nav-link--active{% endif %}">
+        Home
+      </a>
+      <a href="{{ url_for('fee_calculator') }}"
+         class="nav-link nav-link--fee {% if active_page == 'fee' %}nav-link--active{% endif %}">
+        Fee Calculator
+      </a>
+      <a href="{{ url_for('lab_search') }}"
+         class="nav-link nav-link--lims {% if active_page == 'lims' %}nav-link--active{% endif %}">
+        LIMS Labs
+      </a>
+      <a href="{{ url_for('crs_search') }}"
+         class="nav-link nav-link--crs {% if active_page == 'crs' %}nav-link--active{% endif %}">
+        CRS Labs
+      </a>
+      <button class="theme-toggle" aria-label="Toggle theme">☀️</button>
+    </nav>
+
+    <button class="nav-hamburger" id="navHamburger" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+    <a href="{{ url_for('index') }}"
+       class="mobile-nav-link {% if active_page == 'home' %}active-home{% endif %}">🏠 Home</a>
+    <a href="{{ url_for('fee_calculator') }}"
+       class="mobile-nav-link {% if active_page == 'fee' %}active-fee{% endif %}">🧮 Fee Calculator</a>
+    <a href="{{ url_for('lab_search') }}"
+       class="mobile-nav-link {% if active_page == 'lims' %}active-lims{% endif %}">🔬 LIMS Labs</a>
+    <a href="{{ url_for('crs_search') }}"
+       class="mobile-nav-link {% if active_page == 'crs' %}active-crs{% endif %}">📋 CRS Labs</a>
+    <div style="margin-top:8px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.12)">
+      <button class="theme-toggle" style="width:100%;border-radius:var(--radius-sm);height:42px;font-size:0.86rem;gap:8px;display:flex;align-items:center;justify-content:center;">
+        ☀️ Toggle Theme
+      </button>
+    </div>
+  </div>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <div class="footer-credit">&copy; 2026 Made By Prashant ❤️</div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_js %}{% endblock %}
+
+</body>
+</html>

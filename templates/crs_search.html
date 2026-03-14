@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}CRS Lab Search{% endblock %}
+
+{% block extra_css %}
+<style>
+.table-wrap {
+  background: var(--card-bg); border: 1px solid var(--border-accent);
+  border-top: 3px solid var(--nav-crs-active);
+  border-radius: var(--radius-lg); overflow: hidden;
+  animation: fadeUp 0.28s ease both; box-shadow: var(--shadow-card);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.results-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.results-table thead tr { background: rgba(224,122,90,0.06); border-bottom: 1px solid var(--border-accent); }
+.results-table th {
+  padding: 11px 14px; font-size: 0.63rem; font-weight: 700;
+  letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--nav-crs-active); text-align: left; white-space: nowrap;
+}
+.results-table td {
+  padding: 11px 14px; font-size: 0.81rem; color: var(--text);
+  border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.45;
+}
+.results-table tr:last-child td { border-bottom: none; }
+.results-table tbody .main-row:hover td { background: rgba(37,99,168,0.04); }
+body.theme-light .results-table tbody .main-row:hover td { background: rgba(13,63,122,0.03); }
+.sno { font-size: 0.67rem; color: var(--muted); }
+.lab-name-cell { max-width: 200px; font-weight: 600; font-size: 0.81rem; }
+.product-cell  { max-width: 220px; font-size: 0.79rem; }
+.remark-cell   { max-width: 155px; font-size: 0.69rem; color: var(--muted); }
+.validity-val  { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+
+/* Expand btn */
+.crs-expand-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.67rem; font-weight: 600; color: var(--accent-light);
+  cursor: pointer; padding: 5px 9px; border-radius: 4px;
+  border: 1px solid var(--border-accent);
+  background: rgba(37,99,168,0.07); transition: all var(--transition);
+  white-space: nowrap; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.crs-expand-btn:hover  { background: rgba(37,99,168,0.16); border-color: var(--border-strong); }
+.crs-expand-btn.active { background: rgba(37,99,168,0.24); color: var(--text); }
+.crs-ei { font-size: 0.56rem; display: inline-block; transition: transform 0.18s; }
+.crs-ei.rotated { transform: rotate(90deg); }
+
+/* Inline breakup */
+.crs-breakup-row { display: none; }
+.crs-breakup-row.open { display: table-row; }
+.crs-breakup-cell { padding: 0 !important; border-bottom: 2px solid var(--border-accent) !important; }
+.crs-breakup-inner {
+  padding: 14px 20px 18px;
+  background: linear-gradient(180deg, rgba(37,99,168,0.05) 0%, transparent 100%);
+  border-top: 1px solid rgba(37,99,168,0.14);
+}
+body.theme-light .crs-breakup-inner { background: rgba(13,63,122,0.03); }
+.crs-breakup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 7px; margin-bottom: 12px;
+}
+.crs-breakup-title {
+  font-size: 0.60rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-light);
+}
+.crs-breakup-total {
+  font-size: 0.73rem; font-weight: 700; color: var(--gold-light);
+  background: rgba(201,168,76,0.10); border: 1px solid rgba(201,168,76,0.24);
+  padding: 3px 10px; border-radius: 4px;
+}
+body.theme-light .crs-breakup-total { color: var(--gold); }
+.crs-breakup-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.crs-breakup-table { width: 100%; border-collapse: collapse; min-width: 400px; }
+.crs-breakup-table th {
+  padding: 7px 10px; font-size: 0.60rem; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--muted); text-align: left;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+body.theme-light .crs-breakup-table th { background: rgba(0,0,0,0.02); border-bottom-color: rgba(0,0,0,0.05); }
+.crs-breakup-table td {
+  padding: 7px 10px; font-size: 0.75rem; color: var(--text-2);
+  line-height: 1.45; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top;
+}
+body.theme-light .crs-breakup-table td { border-bottom-color: rgba(0,0,0,0.05); }
+.crs-breakup-table tr:last-child td { border-bottom: none; }
+.crs-breakup-table tbody tr:hover td { background: rgba(37,99,168,0.04); }
+.crs-charge-val { font-weight: 700; color: var(--gold-light) !important; white-space: nowrap; font-size: 0.77rem !important; }
+body.theme-light .crs-charge-val { color: var(--gold) !important; }
+.crs-remark-note {
+  margin-top: 10px; padding: 9px 13px;
+  background: rgba(255,255,255,0.02); border-radius: 0 4px 4px 0;
+  border-left: 2px solid var(--border-accent);
+  font-size: 0.70rem; color: var(--muted); line-height: 1.6; font-style: italic;
+}
+body.theme-light .crs-remark-note { background: rgba(0,0,0,0.02); }
+
+@media (max-width: 768px) {
+  .results-table th, .results-table td { padding: 8px 10px; }
+  .hide-mobile { display: none; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="page-header">
+    <nav class="breadcrumb"><a href="{{ url_for('index') }}">Home</a><span class="breadcrumb-sep">/</span><span>CRS Lab Search</span></nav>
+    <h1>CRS — Compulsory Registration Scheme Lab Search</h1>
+    <p>Find labs registered under BIS Compulsory Registration Scheme. Search by OSL code, lab name, IS number, or product keyword to retrieve registration details and charge breakups.</p>
+  </div>
+
+  <div class="filter-panel">
+    <div class="filter-grid filter-grid--4">
+      <div class="filter-group">
+        <label for="oslFilter">OSL Code</label>
+        <input type="text" class="filter-input" id="oslFilter" placeholder="e.g. 8164006">
+      </div>
+      <div class="filter-group">
+        <label for="labNameFilter">Lab Name</label>
+        <input type="text" class="filter-input" id="labNameFilter" placeholder="e.g. CETL, NPL…">
+      </div>
+      <div class="filter-group">
+        <label for="isNoFilter">IS Number</label>
+        <input type="text" class="filter-input" id="isNoFilter" placeholder="e.g. IS 302…">
+      </div>
+      <div class="filter-group">
+        <label for="queryFilter">Product Keyword</label>
+        <input type="text" class="filter-input" id="queryFilter" placeholder="Product, keyword…">
+      </div>
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button class="btn-primary" id="searchBtn">Search</button>
+          <button class="btn-ghost"   id="clearBtn">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-meta" id="resultsMeta" style="display:none">
+    <div class="results-count" id="resultsCount"></div>
+    <button class="btn-export-pdf" id="exportCrsPdfBtn" style="display:none" onclick="exportCRSPDF()">📄 Export Results as PDF</button>
+  </div>
+  <div class="spinner" id="spinner">Searching CRS laboratories…</div>
+  <div id="tableContainer"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <span class="icon">📋</span><p>No CRS labs found. Try adjusting your filters.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  let allCRSResults = [];
+
+  function fmtCharge(v){ if(!v||v==='-') return '—'; const n=parseFloat(v); return isNaN(n)?String(v):'₹'+n.toLocaleString('en-IN'); }
+
+  async function doSearch(){
+    const osl=document.getElementById('oslFilter').value.trim();
+    const lab=document.getElementById('labNameFilter').value.trim();
+    const isn=document.getElementById('isNoFilter').value.trim();
+    const q=document.getElementById('queryFilter').value.trim();
+    document.getElementById('spinner').classList.add('show');
+    document.getElementById('tableContainer').innerHTML='';
+    document.getElementById('emptyState').style.display='none';
+    document.getElementById('resultsMeta').style.display='none';
+    const p=new URLSearchParams();
+    if(osl) p.set('osl_code',osl);
+    if(lab) p.set('lab_name',lab);
+    if(isn) p.set('is_no',isn);
+    if(q)   p.set('q',q);
+    try{
+      const records=await(await fetch('/api/crs/search?'+p)).json();
+      allCRSResults = records;
+      document.getElementById('spinner').classList.remove('show');
+      renderTable(records);
+    }catch(e){ document.getElementById('spinner').classList.remove('show'); }
+  }
+
+  function renderTable(records){
+    const container=document.getElementById('tableContainer');
+    const empty=document.getElementById('emptyState');
+    const meta=document.getElementById('resultsMeta');
+    const cnt=document.getElementById('resultsCount');
+    const exportBtn=document.getElementById('exportCrsPdfBtn');
+    if(!records.length){ empty.style.display='block'; return; }
+    meta.style.display='flex';
+    exportBtn.style.display='inline-flex';
+    cnt.innerHTML=`Showing <strong>${records.length}</strong> record${records.length>1?'s':''}`;
+    container.innerHTML=`
+      <div class="table-wrap">
+        <table class="results-table">
+          <thead><tr>
+            <th>#</th>
+            <th>Lab Name</th>
+            <th>OSL Code</th>
+            <th>Indian Standard No.</th>
+            <th>Product / Description</th>
+            <th class="hide-mobile">Testing Charges (Excl. of Taxes)</th>
+            <th class="hide-mobile">Validity Date</th>
+            <th class="hide-mobile">Remark</th>
+            <th>Charge Breakup</th>
+          </tr></thead>
+          <tbody>
+            ${records.map((r,i)=>`
+              <tr class="main-row" data-ridx="${i}">
+                <td class="sno">${i+1}</td>
+                <td class="lab-name-cell">${r.lab_name}</td>
+                <td><span class="badge-accent">${(r.osl_code&&r.osl_code!=='None')?r.osl_code:'—'}</span></td>
+                <td><span class="badge-muted">${r.is_number}</span></td>
+                <td class="product-cell">${r.product}</td>
+                <td class="hide-mobile"><span class="badge-gold">${fmtCharge(r.testing_charges)}</span></td>
+                <td class="hide-mobile"><span class="validity-val">${r.validity_date||'—'}</span></td>
+                <td class="hide-mobile remark-cell">${(r.remark&&r.remark!=='-')?r.remark.substring(0,80)+(r.remark.length>80?'…':''):'—'}</td>
+                <td>${r.breakup&&r.breakup.length
+                  ?`<button class="crs-expand-btn" data-ridx="${i}">Details <span class="crs-ei" id="cei-${i}">▶</span></button>`
+                  :`<span style="color:var(--muted);font-size:0.69rem">—</span>`}</td>
+              </tr>
+              ${r.breakup&&r.breakup.length?`
+              <tr class="crs-breakup-row" id="cbr-${i}">
+                <td colspan="9" class="crs-breakup-cell">
+                  <div class="crs-breakup-inner">
+                    <div class="crs-breakup-header">
+                      <span class="crs-breakup-title">Charge Breakup — ${r.is_number} | ${r.lab_name}</span>
+                      <span class="crs-breakup-total">Total: ${fmtCharge(r.testing_charges)} (excl. tax)</span>
+                    </div>
+                    <div class="crs-breakup-table-wrap">
+                    <table class="crs-breakup-table">
+                      <thead><tr>
+                        <th>Clause No.</th>
+                        <th>Testing Charges (Excl. of Taxes)</th>
+                        <th>Exclusion</th>
+                        <th>Effective Date</th>
+                      </tr></thead>
+                      <tbody>
+                        ${r.breakup.map(b=>`<tr>
+                          <td style="max-width:300px">${b['Clause No.']||'—'}</td>
+                          <td class="crs-charge-val">₹${Number(b['Testing Charges (Excl. Of Taxes)']).toLocaleString('en-IN')}</td>
+                          <td>${(b['Exclusion']&&b['Exclusion']!=='-')?b['Exclusion']:'—'}</td>
+                          <td style="color:var(--muted);white-space:nowrap">${b['Effective Date']||'—'}</td>
+                        </tr>`).join('')}
+                      </tbody>
+                    </table>
+                    </div>
+                    ${r.breakup[0]?.Remark&&r.breakup[0].Remark.trim()
+                      ?`<div class="crs-remark-note">ℹ️ ${r.breakup[0].Remark.replace(/\r\n/g,' ')}</div>`:''}
+                  </div>
+                </td>
+              </tr>`:''}`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    document.querySelectorAll('.crs-expand-btn').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const idx=btn.dataset.ridx;
+        const br=document.getElementById('cbr-'+idx);
+        const ei=document.getElementById('cei-'+idx);
+        if(br){ const open=br.classList.toggle('open');
+          btn.classList.toggle('active',open);
+          if(ei) ei.classList.toggle('rotated',open); }
+      });
+    });
+  }
+
+  // ── PDF EXPORT: CRS Results ──
+  window.exportCRSPDF = function(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,0,pageW,22,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('BUREAU OF INDIAN STANDARDS — CRS Registered Laboratories', pageW/2, 10, {align:'center'});
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,230);
+    doc.text('Compulsory Registration Scheme | Generated: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}), pageW/2, 17, {align:'center'});
+
+    const body = allCRSResults.map((r,i)=>[
+      i+1,
+      r.lab_name?.substring(0,40)||'—',
+      r.osl_code&&r.osl_code!=='None'?r.osl_code:'—',
+      r.is_number||'—',
+      r.product?.substring(0,50)||'—',
+      r.grade?.substring(0,30)||'—',
+      r.testing_charges?'Rs.'+parseFloat(r.testing_charges).toLocaleString('en-IN'):'—',
+      r.validity_date||'—',
+      r.remark&&r.remark!=='-'?r.remark.substring(0,30):'—',
+    ]);
+
+    doc.autoTable({
+      startY:26,
+      head:[['#','Lab Name','OSL Code','IS Number','Product','Grade / Type','Testing Charges (Excl. Tax)','Validity Date','Remark']],
+      body: body,
+      theme:'grid',
+      headStyles:{ fillColor:[7,26,54], textColor:255, fontStyle:'bold', fontSize:7 },
+      bodyStyles:{ fontSize:7.2, textColor:[10,30,61] },
+      alternateRowStyles:{ fillColor:[238,244,251] },
+      columnStyles:{ 0:{cellWidth:8,halign:'center'}, 1:{cellWidth:45}, 2:{cellWidth:18}, 3:{cellWidth:22}, 4:{cellWidth:50}, 5:{cellWidth:30}, 6:{cellWidth:28}, 7:{cellWidth:22}, 8:{cellWidth:35} },
+      margin:{ left:8, right:8 },
+    });
+
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,pageH-10,pageW,10,'F');
+    doc.setTextColor(180,200,230); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('Bureau of Indian Standards — bis.gov.in | Data for informational purposes only.', pageW/2, pageH-4, {align:'center'});
+    doc.save('BIS_CRS_Labs_'+new Date().toISOString().slice(0,10)+'.pdf');
+  };
+
+  document.getElementById('searchBtn').addEventListener('click',doSearch);
+  document.getElementById('clearBtn').addEventListener('click',()=>{
+    ['oslFilter','labNameFilter','isNoFilter','queryFilter'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('tableContainer').innerHTML='';
+    document.getElementById('resultsMeta').style.display='none';
+    document.getElementById('emptyState').style.display='none';
+    allCRSResults=[];
+  });
+  ['oslFilter','labNameFilter','isNoFilter','queryFilter'].forEach(id=>
+    document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(); }));
+
+  doSearch();
+}());
+</script>
+{% endblock %}

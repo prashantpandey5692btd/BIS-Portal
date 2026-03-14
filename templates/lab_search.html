@@ -1,0 +1,638 @@
+{% extends "base.html" %}
+{% block title %}LIMS Lab Search{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── LAB CARDS ── */
+.lab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+.lab-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-top: 2px solid var(--border-accent);
+  border-radius: var(--radius-lg); padding: 18px 20px;
+  cursor: pointer; transition: all 0.22s;
+  animation: fadeUp 0.28s ease both;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-card);
+  -webkit-tap-highlight-color: transparent;
+}
+.lab-card:hover {
+  border-color: var(--border-strong);
+  border-top-color: var(--accent-light);
+  transform: translateY(-3px);
+  box-shadow: 0 14px 44px rgba(0,0,0,0.22);
+}
+body.theme-light .lab-card:hover { box-shadow: 0 10px 30px rgba(10,30,61,0.10); }
+.lab-card-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 10px; gap: 8px;
+}
+.lab-name {
+  font-size: 0.92rem; font-weight: 700; color: var(--text);
+  line-height: 1.35; margin-bottom: 7px;
+}
+.lab-address {
+  font-size: 0.73rem; color: var(--muted); line-height: 1.60; margin-bottom: 10px;
+}
+.lab-meta { display: flex; gap: 11px; flex-wrap: wrap; margin-bottom: 10px; }
+.lab-meta-item { font-size: 0.72rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.lab-meta-item strong { color: var(--text-2); }
+.lab-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  border-top: 1px solid var(--border); padding-top: 10px; margin-top: auto;
+}
+.lab-validity { font-size: 0.69rem; color: var(--muted); }
+.scope-view-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.72rem; font-weight: 600; color: var(--accent-light);
+  background: rgba(37,99,168,0.10); border: 1px solid rgba(37,99,168,0.28);
+  padding: 4px 11px; border-radius: 4px; transition: all var(--transition);
+}
+.lab-card:hover .scope-view-badge {
+  background: rgba(37,99,168,0.20); border-color: var(--border-strong);
+}
+
+/* ── MODAL SHELL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,0.82); backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; opacity: 0; pointer-events: none;
+  transition: opacity 0.22s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--card-bg); border: 1px solid var(--border-accent);
+  border-top: 3px solid var(--accent-light);
+  border-radius: var(--radius-xl); width: 100%; max-width: 1000px;
+  max-height: 90vh; overflow-y: auto;
+  transform: translateY(20px); transition: transform 0.26s;
+  box-shadow: var(--shadow-modal);
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+
+@media (max-width: 520px) {
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    max-height: 93vh; border-bottom: none;
+  }
+}
+
+.modal-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--card-bg); border-bottom: 1px solid var(--border);
+  padding: 18px 24px;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+}
+.modal-badge {
+  font-size: 0.60rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-light); margin-bottom: 5px;
+}
+.modal-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.10rem; font-weight: 700; line-height: 1.28; color: var(--text);
+}
+.modal-close {
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  width: 32px; height: 32px; border-radius: 6px;
+  color: var(--muted); font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+body.theme-light .modal-close { background: rgba(0,0,0,0.05); }
+.modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+.modal-body { padding: 22px 24px; }
+
+/* Tabs */
+.modal-tabs {
+  display: flex; gap: 2px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-tab {
+  padding: 9px 16px; font-size: 0.77rem; font-weight: 600;
+  color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all var(--transition); white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.modal-tab:hover:not(.active) { color: var(--text-2); }
+.modal-tab.active { color: var(--accent-light); border-bottom-color: var(--accent-light); }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* Contact grid */
+.detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
+}
+@media (max-width: 520px) { .detail-grid { grid-template-columns: 1fr; } }
+.detail-item {
+  background: var(--card-bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+}
+.detail-item-label {
+  font-size: 0.59rem; font-weight: 700; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 5px;
+}
+.detail-item-val { font-size: 0.84rem; color: var(--text); line-height: 1.45; word-break: break-word; }
+.detail-full { grid-column: 1 / -1; }
+
+/* PDF actions in modal */
+.modal-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-bottom: 16px;
+}
+
+/* ── SCOPE TABLE ── */
+.scope-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scope-table { width: 100%; border-collapse: collapse; min-width: 580px; }
+.scope-table th {
+  padding: 10px 12px; font-size: 0.63rem; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-light); text-align: left; white-space: nowrap;
+  background: rgba(37,99,168,0.07); border-bottom: 1px solid var(--border-accent);
+}
+.scope-table td {
+  padding: 10px 12px; font-size: 0.80rem; color: var(--text);
+  vertical-align: top; line-height: 1.44; border-bottom: 1px solid var(--border);
+}
+.scope-main-row:hover td { background: rgba(37,99,168,0.04); }
+body.theme-light .scope-main-row:hover td { background: rgba(13,63,122,0.03); }
+.scope-table tr:last-child td { border-bottom: none; }
+
+/* Expand btn */
+.expand-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.68rem; font-weight: 600; color: var(--accent-light);
+  cursor: pointer; padding: 5px 9px; border-radius: 4px;
+  border: 1px solid var(--border-accent);
+  background: rgba(37,99,168,0.07); transition: all var(--transition);
+  white-space: nowrap; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.expand-btn:hover  { background: rgba(37,99,168,0.16); border-color: var(--border-strong); }
+.expand-btn.active { background: rgba(37,99,168,0.24); color: var(--text); }
+.expand-icon { font-size: 0.56rem; display: inline-block; transition: transform 0.18s; }
+.expand-icon.rotated { transform: rotate(90deg); }
+
+/* Breakup inline rows */
+.breakup-row { display: none; }
+.breakup-row.open { display: table-row; }
+.breakup-cell { padding: 0 !important; border-bottom: 2px solid var(--border-accent) !important; }
+.breakup-inner {
+  padding: 14px 20px 18px;
+  background: linear-gradient(180deg, rgba(37,99,168,0.05) 0%, transparent 100%);
+  border-top: 1px solid rgba(37,99,168,0.14);
+}
+body.theme-light .breakup-inner { background: rgba(13,63,122,0.03); }
+.breakup-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 7px; margin-bottom: 12px;
+}
+.breakup-title {
+  font-size: 0.61rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent-light);
+}
+.breakup-total {
+  font-size: 0.73rem; font-weight: 700; color: var(--gold-light);
+  background: rgba(201,168,76,0.10); border: 1px solid rgba(201,168,76,0.24);
+  padding: 3px 10px; border-radius: 4px;
+}
+body.theme-light .breakup-total { color: var(--gold); }
+
+.breakup-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.breakup-table { width: 100%; border-collapse: collapse; min-width: 440px; }
+.breakup-table th {
+  padding: 7px 10px; font-size: 0.60rem; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--muted); text-align: left;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+body.theme-light .breakup-table th { background: rgba(0,0,0,0.02); border-bottom-color: rgba(0,0,0,0.06); }
+.breakup-table td {
+  padding: 7px 10px; font-size: 0.75rem; color: var(--text-2);
+  line-height: 1.45; border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: top;
+}
+body.theme-light .breakup-table td { border-bottom-color: rgba(0,0,0,0.05); }
+.breakup-table tr:last-child td { border-bottom: none; }
+.breakup-table tbody tr:hover td { background: rgba(37,99,168,0.04); }
+.breakup-charge-val {
+  font-weight: 700; color: var(--gold-light) !important;
+  white-space: nowrap; font-size: 0.77rem !important;
+}
+body.theme-light .breakup-charge-val { color: var(--gold) !important; }
+.breakup-remark {
+  margin-top: 10px; padding: 9px 13px;
+  background: rgba(255,255,255,0.02); border-radius: 0 4px 4px 0;
+  border-left: 2px solid var(--border-accent);
+  font-size: 0.70rem; color: var(--muted); line-height: 1.6; font-style: italic;
+}
+body.theme-light .breakup-remark { background: rgba(0,0,0,0.02); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div class="page-header">
+    <nav class="breadcrumb"><a href="{{ url_for('index') }}">Home</a><span class="breadcrumb-sep">/</span><span>LIMS Lab Search</span></nav>
+    <h1>LIMS — Accredited Laboratory Search</h1>
+    <p>Find BIS-accredited laboratories across India. Filter by state and lab code, or search by name and keyword. Click any lab card to view full test scope and charge breakups.</p>
+  </div>
+
+  <div class="filter-panel">
+    <div class="filter-grid">
+      <div class="filter-group">
+        <label for="stateFilter">State / Union Territory</label>
+        <select class="filter-select" id="stateFilter"><option value="">All States</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="labCodeFilter">Lab Code</label>
+        <select class="filter-select" id="labCodeFilter"><option value="">All Lab Codes</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="labNameFilter">Lab Name</label>
+        <input type="text" class="filter-input" id="labNameFilter" placeholder="e.g. IOCL, NPL…">
+      </div>
+      <div class="filter-group">
+        <label for="queryFilter">Keyword Search</label>
+        <input type="text" class="filter-input" id="queryFilter" placeholder="Any field…">
+      </div>
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button class="btn-primary" id="searchBtn">Search</button>
+          <button class="btn-ghost"   id="clearBtn">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-meta" id="resultsMeta" style="display:none">
+    <div class="results-count" id="resultsCount"></div>
+    <button class="btn-export-pdf" id="exportListPdfBtn" style="display:none" onclick="exportLabListPDF()">📄 Export Results as PDF</button>
+  </div>
+  <div class="spinner" id="spinner">Searching laboratories…</div>
+  <div id="labGrid" class="lab-grid"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <span class="icon">🔬</span><p>No laboratories found. Try adjusting your filters.</p>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-badge">BIS LIMS — Accredited Laboratory Details</div>
+        <div class="modal-title" id="modalTitle"></div>
+      </div>
+      <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  let allLabResults = [];
+  let currentModalLab = null;
+
+  async function loadStates(){
+    try{
+      const states=await(await fetch('/api/lims/states')).json();
+      const sel=document.getElementById('stateFilter');
+      states.forEach(s=>{ const o=document.createElement('option'); o.value=s.name; o.textContent=s.name; sel.appendChild(o); });
+    }catch(e){}
+  }
+
+  async function loadLabCodes(state){
+    const sel=document.getElementById('labCodeFilter');
+    sel.innerHTML='<option value="">All Lab Codes</option>';
+    try{
+      const p=new URLSearchParams(); if(state) p.set('state',state);
+      const labs=await(await fetch('/api/lims/search?'+p)).json();
+      const seen=new Set();
+      labs.forEach(l=>{
+        if(!l.lab_code||seen.has(l.lab_code)) return;
+        seen.add(l.lab_code);
+        const o=document.createElement('option');
+        o.value=l.lab_code;
+        o.textContent=l.lab_code+' — '+(l.lab_name.length>48?l.lab_name.slice(0,48)+'…':l.lab_name);
+        sel.appendChild(o);
+      });
+    }catch(e){}
+  }
+
+  document.getElementById('stateFilter').addEventListener('change',function(){ loadLabCodes(this.value); doSearch(); });
+  document.getElementById('labCodeFilter').addEventListener('change',doSearch);
+
+  async function doSearch(){
+    const state=document.getElementById('stateFilter').value;
+    const labCode=document.getElementById('labCodeFilter').value;
+    const labName=document.getElementById('labNameFilter').value.trim();
+    const query=document.getElementById('queryFilter').value.trim();
+    document.getElementById('spinner').classList.add('show');
+    document.getElementById('labGrid').innerHTML='';
+    document.getElementById('emptyState').style.display='none';
+    document.getElementById('resultsMeta').style.display='none';
+    const p=new URLSearchParams();
+    if(state)   p.set('state',state);
+    if(labCode) p.set('lab_code',labCode);
+    if(labName) p.set('lab_name',labName);
+    if(query)   p.set('q',query);
+    try{
+      const labs=await(await fetch('/api/lims/search?'+p)).json();
+      allLabResults = labs;
+      document.getElementById('spinner').classList.remove('show');
+      renderLabs(labs);
+    }catch(e){ document.getElementById('spinner').classList.remove('show'); }
+  }
+
+  function renderLabs(labs){
+    const grid=document.getElementById('labGrid');
+    const empty=document.getElementById('emptyState');
+    const meta=document.getElementById('resultsMeta');
+    const cnt=document.getElementById('resultsCount');
+    const exportBtn=document.getElementById('exportListPdfBtn');
+    if(!labs.length){ empty.style.display='block'; return; }
+    meta.style.display='flex';
+    exportBtn.style.display='inline-flex';
+    cnt.innerHTML=`Showing <strong>${labs.length}</strong> laborator${labs.length>1?'ies':'y'}`;
+    grid.innerHTML=labs.map((lab,i)=>`
+      <div class="lab-card" data-code="${lab.lab_code}" style="animation-delay:${Math.min(i*.04,.4)}s">
+        <div class="lab-card-top">
+          <span class="badge-accent">${lab.lab_code||'N/A'}</span>
+          <span class="badge-muted">${lab.state}</span>
+        </div>
+        <div class="lab-name">${lab.lab_name}</div>
+        <div class="lab-address">${lab.address?lab.address.substring(0,100)+(lab.address.length>100?'…':''):'—'}</div>
+        <div class="lab-meta">
+          ${lab.contact_person?`<div class="lab-meta-item">👤 <strong>${lab.contact_person}</strong></div>`:''}
+          ${lab.contact_number?`<div class="lab-meta-item">📞 <strong>${lab.contact_number}</strong></div>`:''}
+        </div>
+        <div class="lab-footer">
+          <div class="lab-validity">Valid Till: ${lab.validity_date||'—'}</div>
+          ${lab.scope_count>0
+            ?`<span class="scope-view-badge">👁 View ${lab.scope_count} Scope${lab.scope_count>1?'s':''}</span>`
+            :`<span style="font-size:0.69rem;color:var(--muted)">No scope</span>`}
+        </div>
+      </div>`).join('');
+    grid.querySelectorAll('.lab-card').forEach(c=>c.addEventListener('click',()=>openModal(c.dataset.code)));
+  }
+
+  async function openModal(labCode){
+    if(!labCode||labCode==='N/A') return;
+    try{
+      const lab=await(await fetch('/api/lims/lab/'+labCode)).json();
+      if(lab.error) return;
+      currentModalLab = lab;
+      document.getElementById('modalTitle').textContent=lab['Lab Name'];
+      const scope=lab['View Scope']||[];
+      const defaultTab=scope.length?'scope':'contact';
+
+      document.getElementById('modalBody').innerHTML=`
+        <div class="modal-actions">
+          <button class="btn-export-pdf" onclick="exportLabDetailPDF()">📄 Export Lab Details as PDF</button>
+        </div>
+        <div class="modal-tabs">
+          <div class="modal-tab ${defaultTab==='contact'?'active':''}" data-tab="contact">Contact Information</div>
+          ${scope.length?`<div class="modal-tab ${defaultTab==='scope'?'active':''}" data-tab="scope">
+            Test Scope <span style="font-size:0.66rem;opacity:.7">(${scope.length} standards)</span></div>`:''}
+        </div>
+
+        <div id="tab-contact" class="tab-pane ${defaultTab==='contact'?'active':''}">
+          <div class="detail-grid">
+            ${di('Lab Code',lab['Lab Code'])}${di('State',lab.state)}
+            ${di('Contact Person',lab['Contact Person'])}${di('Contact Number',lab['Contact Number'])}
+            ${di('Email Address',lab['Email'])}${di('Validity Date',lab['Validity Date'])}
+            ${lab['Address']?`<div class="detail-item detail-full"><div class="detail-item-label">Full Address</div>
+              <div class="detail-item-val">${lab['Address']}</div></div>`:''}
+          </div>
+        </div>
+
+        ${scope.length?`
+        <div id="tab-scope" class="tab-pane ${defaultTab==='scope'?'active':''}">
+          <div class="scope-table-wrap">
+          <table class="scope-table">
+            <thead><tr>
+              <th style="width:38px">#</th>
+              <th style="width:155px">IS Number</th>
+              <th>Product / Description</th>
+              <th style="width:135px">Testing Charges (Excl. of Taxes)</th>
+              <th style="width:105px">Valid Till</th>
+              <th style="width:115px">Charge Breakup</th>
+            </tr></thead>
+            <tbody>
+              ${scope.map((s,idx)=>{
+                const bk=s['Testing Charges Breakup']||[];
+                const tot=parseFloat(s['Testing Charges (Excl. Of Taxes)']);
+                return `
+                <tr class="scope-main-row">
+                  <td style="color:var(--muted);font-size:0.68rem">${s['S.No.']}</td>
+                  <td style="font-size:0.75rem;font-weight:700;color:var(--accent-light);white-space:nowrap">${s['Indian Standard No.']}</td>
+                  <td style="font-size:0.80rem;line-height:1.44">${s['Product']}</td>
+                  <td><span class="badge-gold">₹${isNaN(tot)?s['Testing Charges (Excl. Of Taxes)']:tot.toLocaleString('en-IN')}</span></td>
+                  <td style="font-size:0.72rem;color:var(--muted)">${s['Validity Date']||'—'}</td>
+                  <td>${bk.length?`<button class="expand-btn" data-idx="${idx}">View <span class="expand-icon" id="ei-${idx}">▶</span></button>`
+                    :`<span style="color:var(--muted);font-size:0.69rem">—</span>`}</td>
+                </tr>
+                ${bk.length?`
+                <tr class="breakup-row" id="br-${idx}">
+                  <td colspan="6" class="breakup-cell">
+                    <div class="breakup-inner">
+                      <div class="breakup-title-row">
+                        <span class="breakup-title">Charge Breakup — ${s['Indian Standard No.']}</span>
+                        <span class="breakup-total">Total: ₹${isNaN(tot)?'—':tot.toLocaleString('en-IN')} excl. tax</span>
+                      </div>
+                      <div class="breakup-table-wrap">
+                      <table class="breakup-table">
+                        <thead><tr>
+                          <th>Clause No.</th>
+                          <th>Testing Charges (Excl. of Taxes)</th>
+                          <th>Exclusion</th>
+                          <th>Effective Date</th>
+                        </tr></thead>
+                        <tbody>
+                          ${bk.map(b=>`<tr>
+                            <td style="max-width:300px">${b['Clause No.']}</td>
+                            <td class="breakup-charge-val">₹${Number(b['Testing Charges (Excl. Of Taxes)']).toLocaleString('en-IN')}</td>
+                            <td>${(b['Exclusion']&&b['Exclusion']!=='-')?b['Exclusion']:'—'}</td>
+                            <td style="color:var(--muted);white-space:nowrap">${b['Effective Date']||'—'}</td>
+                          </tr>`).join('')}
+                        </tbody>
+                      </table>
+                      </div>
+                      ${bk[0]?.Remark&&bk[0].Remark.trim()?`<div class="breakup-remark">ℹ️ ${bk[0].Remark.replace(/\r\n/g,' ')}</div>`:''}
+                    </div>
+                  </td>
+                </tr>`:''}`;
+              }).join('')}
+            </tbody>
+          </table>
+          </div>
+        </div>`:''}
+      `;
+
+      document.querySelectorAll('.modal-tab').forEach(tab=>{
+        tab.addEventListener('click',()=>{
+          document.querySelectorAll('.modal-tab').forEach(t=>t.classList.remove('active'));
+          document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('tab-'+tab.dataset.tab)?.classList.add('active');
+        });
+      });
+
+      document.querySelectorAll('.expand-btn').forEach(btn=>{
+        btn.addEventListener('click',e=>{
+          e.stopPropagation();
+          const idx=btn.dataset.idx;
+          const br=document.getElementById('br-'+idx);
+          const ei=document.getElementById('ei-'+idx);
+          if(br){ const open=br.classList.toggle('open');
+            btn.classList.toggle('active',open);
+            if(ei) ei.classList.toggle('rotated',open); }
+        });
+      });
+
+      document.getElementById('modalOverlay').classList.add('open');
+      document.getElementById('modal').scrollTop=0;
+    }catch(e){ console.error(e); }
+  }
+
+  function di(label,val){
+    if(!val) return '';
+    return `<div class="detail-item"><div class="detail-item-label">${label}</div><div class="detail-item-val">${val}</div></div>`;
+  }
+
+  function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+  document.getElementById('modalClose').addEventListener('click',closeModal);
+  document.getElementById('modalOverlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeModal(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+  document.getElementById('clearBtn').addEventListener('click',()=>{
+    document.getElementById('stateFilter').value='';
+    document.getElementById('labCodeFilter').innerHTML='<option value="">All Lab Codes</option>';
+    document.getElementById('labNameFilter').value='';
+    document.getElementById('queryFilter').value='';
+    document.getElementById('labGrid').innerHTML='';
+    document.getElementById('resultsMeta').style.display='none';
+    document.getElementById('emptyState').style.display='none';
+    allLabResults=[];
+  });
+  ['labNameFilter','queryFilter'].forEach(id=>
+    document.getElementById(id).addEventListener('keydown',e=>{ if(e.key==='Enter') doSearch(); }));
+  document.getElementById('searchBtn').addEventListener('click',doSearch);
+
+  // ── PDF EXPORT: Lab List ──
+  window.exportLabListPDF = function(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,0,pageW,22,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('BUREAU OF INDIAN STANDARDS — LIMS Accredited Laboratories', pageW/2, 10, {align:'center'});
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,230);
+    doc.text('Generated: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}), pageW/2, 17, {align:'center'});
+
+    const body = allLabResults.map((l,i)=>[i+1, l.lab_code||'—', l.lab_name, l.state, l.address?(l.address.substring(0,50)+(l.address.length>50?'…':'')):'—', l.contact_person||'—', l.contact_number||'—', l.validity_date||'—', l.scope_count]);
+    doc.autoTable({
+      startY:26,
+      head:[['#','Lab Code','Lab Name','State','Address','Contact Person','Contact No.','Valid Till','Scope Count']],
+      body: body,
+      theme:'grid',
+      headStyles:{ fillColor:[7,26,54], textColor:255, fontStyle:'bold', fontSize:7.5 },
+      bodyStyles:{ fontSize:7.5, textColor:[10,30,61] },
+      alternateRowStyles:{ fillColor:[238,244,251] },
+      columnStyles:{ 0:{cellWidth:8}, 1:{cellWidth:18}, 2:{cellWidth:55}, 3:{cellWidth:25}, 4:{cellWidth:55}, 5:{cellWidth:30}, 6:{cellWidth:25}, 7:{cellWidth:22}, 8:{cellWidth:14,halign:'center'} },
+      margin:{ left:10, right:10 },
+    });
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,pageH-10,pageW,10,'F');
+    doc.setTextColor(180,200,230); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('Bureau of Indian Standards — bis.gov.in | Data for informational purposes only.', pageW/2, pageH-4, {align:'center'});
+    doc.save('BIS_LIMS_Labs_'+new Date().toISOString().slice(0,10)+'.pdf');
+  };
+
+  // ── PDF EXPORT: Lab Detail ──
+  window.exportLabDetailPDF = function(){
+    if(!currentModalLab) return;
+    const lab = currentModalLab;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,0,pageW,26,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('BUREAU OF INDIAN STANDARDS — Lab Detail', pageW/2, 11, {align:'center'});
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,230);
+    doc.text(lab['Lab Name']||'', pageW/2, 18, {align:'center'});
+    doc.setTextColor(201,168,76); doc.setFontSize(7.5);
+    doc.text('Generated: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}), pageW/2, 23, {align:'center'});
+
+    doc.autoTable({
+      startY:30,
+      head:[['Field','Value']],
+      body:[
+        ['Lab Code', lab['Lab Code']||'—'],
+        ['Lab Name', lab['Lab Name']||'—'],
+        ['State', lab.state||'—'],
+        ['Address', lab['Address']||'—'],
+        ['Contact Person', lab['Contact Person']||'—'],
+        ['Contact Number', lab['Contact Number']||'—'],
+        ['Email Address', lab['Email']||'—'],
+        ['Validity Date', lab['Validity Date']||'—'],
+      ],
+      theme:'grid',
+      headStyles:{ fillColor:[7,26,54], textColor:255, fontStyle:'bold', fontSize:8.5 },
+      bodyStyles:{ fontSize:9, textColor:[10,30,61] },
+      alternateRowStyles:{ fillColor:[238,244,251] },
+      columnStyles:{ 0:{ fontStyle:'bold', cellWidth:55, textColor:[37,99,168] } },
+      margin:{ left:14, right:14 },
+    });
+
+    const scope = lab['View Scope']||[];
+    if(scope.length){
+      let y = doc.lastAutoTable.finalY+8;
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(37,99,168);
+      doc.text('TEST SCOPE ('+scope.length+' Standards)', 14, y); y+=3;
+      const scopeBody = scope.map(s=>[s['S.No.'], s['Indian Standard No.'], s['Product']?.substring(0,55)||'—', s['Testing Charges (Excl. Of Taxes)']?'₹'+parseFloat(s['Testing Charges (Excl. Of Taxes)']).toLocaleString('en-IN'):'—', s['Validity Date']||'—']);
+      doc.autoTable({
+        startY:y,
+        head:[['#','IS Number','Product / Description','Testing Charges (Excl. Tax)','Valid Till']],
+        body: scopeBody,
+        theme:'grid',
+        headStyles:{ fillColor:[26,79,140], textColor:255, fontStyle:'bold', fontSize:7.5 },
+        bodyStyles:{ fontSize:8, textColor:[10,30,61] },
+        alternateRowStyles:{ fillColor:[238,244,251] },
+        columnStyles:{ 0:{cellWidth:10,halign:'center'}, 1:{cellWidth:30}, 4:{cellWidth:22} },
+        margin:{ left:14, right:14 },
+      });
+    }
+
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(7,26,54);
+    doc.rect(0,pageH-10,pageW,10,'F');
+    doc.setTextColor(180,200,230); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('Bureau of Indian Standards — bis.gov.in | Data for informational purposes only.', pageW/2, pageH-4, {align:'center'});
+    doc.save('BIS_Lab_'+String(lab['Lab Code']||'detail').replace(/\s+/g,'_')+'.pdf');
+  };
+
+  loadStates(); doSearch();
+}());
+</script>
+{% endblock %}

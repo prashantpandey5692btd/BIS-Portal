@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+{% block title %}Fee Calculator{% endblock %}
+
+{% block extra_css %}
+<style>
+.fee-page {
+  position: relative; z-index: 1;
+  max-width: 900px; margin: 0 auto;
+  padding: 36px 28px 88px;
+}
+@media (max-width: 520px) { .fee-page { padding: 24px 16px 64px; } }
+
+/* Search panel */
+.search-panel {
+  background: var(--card-bg); border: 1px solid var(--border-accent);
+  border-top: 3px solid var(--accent-light);
+  border-radius: var(--radius-lg); padding: 24px 26px;
+  margin-bottom: 26px; box-shadow: var(--shadow-card);
+}
+.search-label {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-light);
+  margin-bottom: 12px; display: block;
+}
+.search-row { display: flex; gap: 10px; }
+@media (max-width: 480px) { .search-row { flex-direction: column; } }
+.autocomplete-wrap { position: relative; flex: 1; }
+.search-input {
+  width: 100%; background: var(--card-bg-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 16px; font-size: 0.96rem; color: var(--text);
+  font-family: inherit; outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  -webkit-appearance: none;
+}
+@media (max-width: 520px) { .search-input { font-size: 16px; } }
+.search-input::placeholder { color: var(--muted); }
+.search-input:focus {
+  border-color: var(--accent-light); box-shadow: 0 0 0 3px rgba(37,99,168,0.12);
+}
+
+/* Suggestions */
+.suggestions {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--card-bg); border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md); max-height: 400px; overflow-y: auto;
+  z-index: 300; box-shadow: var(--shadow-modal); display: none;
+}
+.suggestions.open { display: block; }
+.suggestion-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 16px; cursor: pointer;
+  border-bottom: 1px solid var(--border); transition: background 0.12s;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover, .suggestion-item.active { background: rgba(37,99,168,0.09); }
+.sug-no { font-size: 0.73rem; font-weight: 700; color: var(--accent-light); white-space: nowrap; min-width: 90px; padding-top: 1px; letter-spacing: 0.04em; }
+.sug-title { font-size: 0.82rem; color: var(--text-2); line-height: 1.40; }
+
+.hint-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 14px; }
+.hint-pill {
+  padding: 5px 12px; border-radius: 4px; font-size: 0.72rem;
+  color: var(--muted); background: var(--card-bg-2);
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all var(--transition); -webkit-tap-highlight-color: transparent;
+}
+.hint-pill:hover { color: var(--text); border-color: var(--border-accent); background: rgba(37,99,168,0.07); }
+
+/* Result card */
+.result-card {
+  background: var(--card-bg); border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg); overflow: hidden;
+  animation: fadeUp 0.30s ease both; box-shadow: var(--shadow-card);
+}
+.result-card::before {
+  content: ''; display: block; height: 4px;
+  background: linear-gradient(90deg, var(--accent-light) 0%, var(--gold-light) 100%);
+}
+.result-header {
+  background: linear-gradient(135deg, rgba(37,99,168,0.08) 0%, rgba(201,168,76,0.03) 100%);
+  padding: 22px 26px; border-bottom: 1px solid var(--border);
+}
+body.theme-light .result-header { background: linear-gradient(135deg, rgba(13,63,122,0.05) 0%, rgba(154,115,24,0.02) 100%); }
+.result-is-badge {
+  display: inline-block; margin-bottom: 10px;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--accent-light);
+  background: rgba(37,99,168,0.12); border: 1px solid rgba(37,99,168,0.32);
+  padding: 4px 10px; border-radius: 4px;
+}
+.result-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.20rem; font-weight: 700; line-height: 1.38; color: var(--text);
+}
+.result-unit {
+  margin-top: 10px; font-size: 0.75rem; color: var(--muted);
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+}
+.result-unit span {
+  background: rgba(201,168,76,0.09); border: 1px solid rgba(201,168,76,0.24);
+  padding: 3px 9px; border-radius: 4px; color: var(--gold-light); font-weight: 700;
+}
+body.theme-light .result-unit span { color: var(--gold); }
+.result-body { padding: 22px 26px; }
+
+/* Fee tiles */
+.fee-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 6px;
+}
+@media (max-width: 540px) { .fee-grid { grid-template-columns: repeat(2,1fr); } }
+.fee-tile {
+  background: var(--card-bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px 12px;
+  text-align: center; transition: all var(--transition);
+}
+.fee-tile:hover { border-color: var(--border-accent); }
+.fee-tile.primary { border-color: var(--border-accent); background: rgba(37,99,168,0.08); }
+.fee-tile-label {
+  font-size: 0.62rem; color: var(--muted); letter-spacing: 0.12em;
+  text-transform: uppercase; margin-bottom: 8px; font-weight: 600;
+}
+.fee-tile-amount {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.32rem; font-weight: 700; line-height: 1; color: var(--text);
+}
+.fee-tile.primary .fee-tile-amount { color: var(--accent-light); }
+.fee-tile-sub { font-size: 0.57rem; color: var(--muted); margin-top: 5px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* Full data table */
+.full-data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
+.full-data-table {
+  width: 100%; border-collapse: collapse; min-width: 560px;
+}
+.full-data-table th {
+  padding: 10px 13px; font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--accent-light); text-align: left;
+  background: rgba(37,99,168,0.07); border-bottom: 1px solid var(--border-accent);
+  white-space: nowrap;
+}
+.full-data-table td {
+  padding: 10px 13px; font-size: 0.83rem; color: var(--text);
+  border-bottom: 1px solid var(--border); vertical-align: middle;
+}
+.full-data-table tr:last-child td { border-bottom: none; }
+.full-data-table tbody tr:hover td { background: rgba(37,99,168,0.04); }
+.full-data-table .label-col {
+  color: var(--muted); font-size: 0.77rem; font-weight: 600;
+  white-space: nowrap; width: 280px;
+}
+.full-data-table .value-col { font-weight: 600; }
+.full-data-table .value-money {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.95rem; color: var(--text);
+}
+
+/* Slab table */
+.slab-table { width: 100%; border-collapse: collapse; }
+.slab-table th, .slab-table td {
+  padding: 9px 14px; font-size: 0.83rem; text-align: left; border-bottom: 1px solid var(--border);
+}
+.slab-table th {
+  color: var(--muted); font-weight: 700; font-size: 0.65rem;
+  letter-spacing: 0.11em; text-transform: uppercase; background: rgba(37,99,168,0.05);
+}
+.slab-table td { color: var(--text); }
+.slab-table tr:last-child td { border-bottom: none; }
+.slab-table tbody tr:hover td { background: rgba(37,99,168,0.04); }
+
+/* PDF export area */
+.result-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 10px; margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fee-page">
+  <div class="page-header">
+    <nav class="breadcrumb"><a href="{{ url_for('index') }}">Home</a><span class="breadcrumb-sep">/</span><span>Fee Calculator</span></nav>
+    <h1>IS Number — Fee Lookup</h1>
+    <p>Official BIS marking fees for all enterprise scales. Search by IS number or product keyword to retrieve annual fee schedules, unit rate slabs, and component information.</p>
+  </div>
+
+  <div class="search-panel">
+    <label class="search-label" for="searchInput">Search IS Number or Product Keyword</label>
+    <div class="search-row">
+      <div class="autocomplete-wrap">
+        <input type="text" class="search-input" id="searchInput"
+               placeholder="e.g. IS 302, IS 694, ceiling fan…"
+               autocomplete="off" spellcheck="false">
+        <div class="suggestions" id="suggestions" role="listbox"></div>
+      </div>
+      <button class="btn-primary" id="searchBtn">Look Up</button>
+    </div>
+    <div class="hint-row">
+      <span class="hint-pill" onclick="quickSearch('IS 302')">IS 302</span>
+      <span class="hint-pill" onclick="quickSearch('IS 694')">IS 694</span>
+      <span class="hint-pill" onclick="quickSearch('IS 1')">IS 1</span>
+      <span class="hint-pill" onclick="quickSearch('ceiling fan')">Ceiling Fan</span>
+      <span class="hint-pill" onclick="quickSearch('cement')">Cement</span>
+      <span class="hint-pill" onclick="quickSearch('water pump')">Water Pump</span>
+      <span class="hint-pill" onclick="quickSearch('biscuits')">Biscuits</span>
+    </div>
+  </div>
+
+  <div class="spinner" id="spinner">Fetching fee data…</div>
+  <div id="resultArea"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  const inp=document.getElementById('searchInput');
+  const sug=document.getElementById('suggestions');
+  const res=document.getElementById('resultArea');
+  const spin=document.getElementById('spinner');
+  let dbt=null, ai=-1;
+  let currentData=null;
+
+  function fmt(v){ if(v==null||v==='') return '—'; const n=parseFloat(v); return isNaN(n)?String(v):'₹'+n.toLocaleString('en-IN'); }
+  function fmtNum(v){ if(v==null||v==='') return '—'; const n=parseFloat(v); return isNaN(n)?String(v):n.toLocaleString('en-IN'); }
+
+  window.quickSearch=function(q){ inp.value=q; close_(); load(q); };
+
+  inp.addEventListener('input',()=>{
+    clearTimeout(dbt); const q=inp.value.trim();
+    if(!q){ close_(); return; }
+    dbt=setTimeout(()=>fetchSug(q),200);
+  });
+
+  async function fetchSug(q){
+    try{ renderSug(await(await fetch('/api/search?q='+encodeURIComponent(q))).json()); }
+    catch(e){ close_(); }
+  }
+
+  function renderSug(items){
+    if(!items.length){ close_(); return; }
+    sug.innerHTML=items.map((it,i)=>`
+      <div class="suggestion-item" role="option" data-is="${it.is_no}" data-i="${i}">
+        <span class="sug-no">${it.is_no}</span>
+        <span class="sug-title">${it.is_title}</span>
+      </div>`).join('');
+    sug.classList.add('open'); ai=-1;
+    sug.querySelectorAll('.suggestion-item').forEach(el=>el.addEventListener('click',()=>sel(el.dataset.is)));
+  }
+  function sel(isNo){ inp.value=isNo; close_(); load(isNo); }
+  function close_(){ sug.classList.remove('open'); sug.innerHTML=''; ai=-1; }
+  inp.addEventListener('keydown',e=>{
+    const it=sug.querySelectorAll('.suggestion-item');
+    if(e.key==='ArrowDown'){ e.preventDefault(); ai=Math.min(ai+1,it.length-1); hl(it); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); ai=Math.max(ai-1,0); hl(it); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(ai>=0&&it[ai]) sel(it[ai].dataset.is); else{ close_(); load(inp.value.trim()); } }
+    else if(e.key==='Escape') close_();
+  });
+  function hl(it){ it.forEach((el,i)=>el.classList.toggle('active',i===ai)); if(it[ai]) it[ai].scrollIntoView({block:'nearest'}); }
+  document.getElementById('searchBtn').addEventListener('click',()=>{ close_(); load(inp.value.trim()); });
+  document.addEventListener('click',e=>{ if(!e.target.closest('.autocomplete-wrap')) close_(); });
+
+  async function load(isNo){
+    if(!isNo) return;
+    spin.classList.add('show'); res.innerHTML='';
+    try{
+      const r=await fetch('/api/details?is_no='+encodeURIComponent(isNo));
+      if(!r.ok) throw 0;
+      const d=await r.json();
+      currentData=d;
+      spin.classList.remove('show'); render(d);
+    }catch(e){
+      spin.classList.remove('show');
+      res.innerHTML=`<div class="empty-state"><span class="icon">🔍</span><p>No result for <strong>${isNo}</strong>. Try another IS number or keyword.</p></div>`;
+    }
+  }
+
+  function render(d){
+    // Build slabs
+    const slabs=[];
+    if(d.unit_rate_slab1!=null) slabs.push({num:1, rate:d.unit_rate_slab1, qty:d.slab1_qty||'For All'});
+    if(d.unit_rate_slab2!=null) slabs.push({num:2, rate:d.unit_rate_slab2, qty:d.slab2_qty||'—'});
+    if(d.unit_rate_slab3!=null) slabs.push({num:3, rate:d.unit_rate_slab3, qty:d.slab3_qty||'—'});
+
+    // Full data rows — exact column names from govt website
+    const dataRows=[
+      ['IS Number', d.is_no],
+      ['IS Title', d.is_title],
+      ['Unit of Measurement', d.unit||'—'],
+      ['Large Scale Minimum Marking Fee (Annual) (₹)', fmt(d.marking_fee_large)],
+      ['Medium Scale Minimum Marking Fee (Annual) (₹)', fmt(d.marking_fee_medium)],
+      ['Small Scale Minimum Marking Fee (Annual) — 50% of LSMMF (₹)', fmt(d.marking_fee_small)],
+      ['MicroScale Minimum Marking Fee (Annual) — 20% of LSMMF (₹)', fmt(d.marking_fee_micro)],
+    ];
+    slabs.forEach(s=>{
+      dataRows.push([`Slab ${s.num} — Quantity Range`, s.qty]);
+      dataRows.push([`Slab ${s.num} — Unit Rate (₹)`, fmtNum(s.rate)]);
+    });
+    if(d.component_name) dataRows.push(['Component Name', d.component_name]);
+
+    res.innerHTML=`
+      <div class="result-card" id="resultCard">
+        <div class="result-header">
+          <div class="result-is-badge">${d.is_no}</div>
+          <div class="result-title">${d.is_title}</div>
+          ${d.unit?`<div class="result-unit">Unit of Measurement: <span>${d.unit}</span></div>`:''}
+        </div>
+        <div class="result-body">
+
+          <div class="section-label">Annual Marking Fees by Enterprise Scale</div>
+          <div class="fee-grid">
+            <div class="fee-tile primary">
+              <div class="fee-tile-label">Large Scale</div>
+              <div class="fee-tile-amount">${fmt(d.marking_fee_large)}</div>
+              <div class="fee-tile-sub">per annum</div>
+            </div>
+            <div class="fee-tile">
+              <div class="fee-tile-label">Medium Scale</div>
+              <div class="fee-tile-amount">${fmt(d.marking_fee_medium)}</div>
+              <div class="fee-tile-sub">per annum</div>
+            </div>
+            <div class="fee-tile">
+              <div class="fee-tile-label">Small Scale <small style="display:block;font-size:0.52rem;margin-top:2px;opacity:0.7">(50% of LSMMF)</small></div>
+              <div class="fee-tile-amount">${fmt(d.marking_fee_small)}</div>
+              <div class="fee-tile-sub">per annum</div>
+            </div>
+            <div class="fee-tile">
+              <div class="fee-tile-label">MicroScale <small style="display:block;font-size:0.52rem;margin-top:2px;opacity:0.7">(20% of LSMMF)</small></div>
+              <div class="fee-tile-amount">${fmt(d.marking_fee_micro)}</div>
+              <div class="fee-tile-sub">per annum</div>
+            </div>
+          </div>
+
+          ${slabs.length?`
+          <div class="section-label">Unit Rate Slabs</div>
+          <div class="full-data-table-wrap">
+          <table class="slab-table">
+            <thead>
+              <tr>
+                <th>Slab</th>
+                <th>Quantity Range</th>
+                <th>Unit Rate (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${slabs.map(s=>`
+              <tr>
+                <td style="color:var(--muted);font-size:0.75rem;font-weight:600">Slab ${s.num}</td>
+                <td>${s.qty}</td>
+                <td style="font-weight:700;color:var(--gold-light)">₹${parseFloat(s.rate).toLocaleString('en-IN')}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          </div>`:''}
+
+          <div class="section-label">Complete Data Record</div>
+          <div class="full-data-table-wrap">
+          <table class="full-data-table">
+            <thead><tr><th style="width:50%">Field</th><th>Value</th></tr></thead>
+            <tbody>
+              ${dataRows.map(([label,val])=>`
+              <tr>
+                <td class="label-col">${label}</td>
+                <td class="value-col">${val}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          </div>
+
+          <div class="result-actions">
+            <button class="btn-export-pdf" id="exportPdfBtn" onclick="exportFeePDF()">
+              📄 Export as PDF
+            </button>
+          </div>
+
+        </div>
+      </div>`;
+  }
+
+  // PDF Export for Fee Calculator
+  window.exportFeePDF = function(){
+    if(!currentData) return;
+    const d = currentData;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 15;
+
+    // Header
+    doc.setFillColor(7, 26, 54);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica','bold');
+    doc.text('BUREAU OF INDIAN STANDARDS', pageW/2, 11, {align:'center'});
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(180,200,230);
+    doc.text('Official Marking Fee Schedule', pageW/2, 18, {align:'center'});
+    doc.setTextColor(201,168,76);
+    doc.setFontSize(8);
+    doc.text('Generated: '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}), pageW/2, 24, {align:'center'});
+    y = 35;
+
+    // IS Badge
+    doc.setFillColor(37, 99, 168);
+    doc.roundedRect(14, y-4, 40, 8, 2, 2, 'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text(d.is_no, 34, y+0.5, {align:'center'});
+    y += 8;
+
+    // Title
+    doc.setTextColor(10, 30, 61);
+    doc.setFontSize(13); doc.setFont('helvetica','bold');
+    const titleLines = doc.splitTextToSize(d.is_title, pageW-28);
+    doc.text(titleLines, 14, y);
+    y += titleLines.length * 6 + 3;
+
+    if(d.unit){
+      doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(100,120,160);
+      doc.text('Unit of Measurement: '+d.unit, 14, y); y+=6;
+    }
+    y += 4;
+
+    // Fee table
+    doc.autoTable({
+      startY: y,
+      head:[['Enterprise Scale','Annual Minimum Marking Fee (₹)','Notes']],
+      body:[
+        ['Large Scale', d.marking_fee_large ? parseFloat(d.marking_fee_large).toLocaleString('en-IN') : '—', 'LSMMF (Base Rate)'],
+        ['Medium Scale', d.marking_fee_medium ? parseFloat(d.marking_fee_medium).toLocaleString('en-IN') : '—', ''],
+        ['Small Scale', d.marking_fee_small ? parseFloat(d.marking_fee_small).toLocaleString('en-IN') : '—', '50% of LSMMF'],
+        ['MicroScale', d.marking_fee_micro ? parseFloat(d.marking_fee_micro).toLocaleString('en-IN') : '—', '20% of LSMMF'],
+      ],
+      theme:'grid',
+      headStyles:{ fillColor:[7,26,54], textColor:255, fontStyle:'bold', fontSize:8.5 },
+      bodyStyles:{ fontSize:9, textColor:[10,30,61] },
+      alternateRowStyles:{ fillColor:[238,244,251] },
+      columnStyles:{ 2:{ textColor:[100,120,160], fontSize:8 } },
+      margin:{ left:14, right:14 },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+
+    // Slabs
+    const slabs=[];
+    if(d.unit_rate_slab1!=null) slabs.push(['Slab 1', d.slab1_qty||'For All', parseFloat(d.unit_rate_slab1).toLocaleString('en-IN')]);
+    if(d.unit_rate_slab2!=null) slabs.push(['Slab 2', d.slab2_qty||'—', parseFloat(d.unit_rate_slab2).toLocaleString('en-IN')]);
+    if(d.unit_rate_slab3!=null) slabs.push(['Slab 3', d.slab3_qty||'—', parseFloat(d.unit_rate_slab3).toLocaleString('en-IN')]);
+    if(slabs.length){
+      doc.setFontSize(9); doc.setFont('helvetica','bold');
+      doc.setTextColor(37,99,168);
+      doc.text('UNIT RATE SLABS', 14, y); y+=3;
+      doc.autoTable({
+        startY:y,
+        head:[['Slab','Quantity Range','Unit Rate (₹)']],
+        body: slabs,
+        theme:'grid',
+        headStyles:{ fillColor:[26,79,140], textColor:255, fontStyle:'bold', fontSize:8.5 },
+        bodyStyles:{ fontSize:9, textColor:[10,30,61] },
+        alternateRowStyles:{ fillColor:[238,244,251] },
+        margin:{ left:14, right:14 },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    }
+
+    // Component
+    if(d.component_name){
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(37,99,168);
+      doc.text('COMPONENT NAME', 14, y); y+=5;
+      doc.setFont('helvetica','normal'); doc.setTextColor(10,30,61);
+      doc.text(d.component_name, 14, y); y+=7;
+    }
+
+    // Footer
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(7, 26, 54);
+    doc.rect(0, pageH-14, pageW, 14, 'F');
+    doc.setTextColor(180,200,230); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('Bureau of Indian Standards — bis.gov.in | Data for informational purposes only.', pageW/2, pageH-6, {align:'center'});
+
+    doc.save('BIS_Fee_'+d.is_no.replace(/\s+/g,'_')+'.pdf');
+  };
+
+}());
+</script>
+{% endblock %}
